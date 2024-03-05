@@ -1,5 +1,6 @@
 #include <iostream>
 #include <filesystem>
+#include <format>
 
 #include "src/ImageIO.hpp"
 #include "src/SdfGenerator.hpp"
@@ -33,7 +34,12 @@ int main(int argc, char* argv[])
     std::filesystem::path outputPath (cmdl({"-o", "--output"}, "output_sdf.tiff").str());
 
     auto heightmap = ImageIO::LoadHeightmap(absolute(heightmapPath));
+
+    auto start = std::chrono::high_resolution_clock::now();
     auto sdf = SdfGenerator::GenerateSdfFromHeightmap(heightmap, layers);
+    auto end = std::chrono::high_resolution_clock::now();
+    std::cout << std::format("Calculated SDF[{}, {}, {}] in {:.3f}s", sdf.Width(), sdf.Height(), sdf.Depth(),
+        std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / 1000.0) << std::endl;
 
     // Convert for export
     Image3D<uint8_t> sdfImg(sdf.Width(), sdf.Height(), sdf.Depth());
