@@ -2,6 +2,31 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 
+Image3D<float> SdfGenerator::GenerateSdfFromHeightmap(const Image2D<float>& heightmap, int depth)
+{
+    Image3D<glm::vec3> jfa(heightmap.Width(), heightmap.Height(), depth);
+
+    // Seed Image3D based on heightmap (_ -> glm::vec3 UVW)
+    JfaSeed(heightmap, jfa);
+
+    // Step Image3D log2 res times (glm::vec3 UV -> glm::vec3 UV)
+    int radius = jfa.Width();
+    while(true)
+    {
+        radius /= 2;
+        JfaStep(jfa, radius);
+
+        if(radius <= 1)
+            break;
+    }
+
+    // Distance pass Image3D (glm::vec2 UV -> float DIST)
+    Image3D<float> sdf(jfa.Width(), jfa.Height(), jfa.Depth());
+    JfaDist(jfa, sdf);
+
+    return sdf;
+}
+
 void SdfGenerator::JfaSeed(const Image2D<float>& heightmap, Image3D<glm::vec3>& out)
 {
     for(int z = 0; z < out.Depth(); z++)

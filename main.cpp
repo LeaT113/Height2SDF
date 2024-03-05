@@ -1,10 +1,7 @@
 #include <iostream>
 #include <filesystem>
-#include "src/ImageIO.hpp"
-#include <glm/glm.hpp>
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/io.hpp>
 
+#include "src/ImageIO.hpp"
 #include "src/SdfGenerator.hpp"
 
 int main(int argc, char* argv[])
@@ -16,26 +13,9 @@ int main(int argc, char* argv[])
 
     auto heightmap = ImageIO::LoadHeightmap(absolute(heightmapPath));
 
-    // Seed Image3D based on heightmap (_ -> glm::vec3 UVW)
-    Image3D<glm::vec3> jfa(heightmap.Width(), heightmap.Height(), 10);
-    SdfGenerator::JfaSeed(heightmap, jfa);
+    auto sdf = SdfGenerator::GenerateSdfFromHeightmap(heightmap, 10);
 
-    // Step Image3D log2 res times (glm::vec2 UV -> glm::vec2 UV)
-    int radius = jfa.Width();
-    while(true)
-    {
-        radius /= 2;
-        SdfGenerator::JfaStep(jfa, radius);
-
-        if(radius <= 1)
-            break;
-    }
-
-    // Distance pass Image3D (glm::vec2 UV -> float DIST)
-    Image3D<float> sdf(jfa.Width(), jfa.Height(), jfa.Depth());
-    SdfGenerator::JfaDist(jfa, sdf);
-
-    // Convert for export (float DIST -> uint8_t DIST)
+    // Convert for export
     Image3D<uint8_t> sdfImg(sdf.Width(), sdf.Height(), sdf.Depth());
     for(int z = 0; z < sdfImg.Depth(); z++)
         for(int y = 0; y < sdfImg.Height(); y++)
