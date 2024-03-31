@@ -5,6 +5,7 @@
 #include "src/ImageIO.hpp"
 #include "src/SdfGenerator.hpp"
 #include "argh.h"
+#include "src/SdfGeneratorCuda.cuh"
 
 
 auto constexpr USAGE =
@@ -36,7 +37,8 @@ int main(int argc, char* argv[])
     auto heightmap = ImageIO::LoadHeightmap(absolute(heightmapPath));
 
     auto start = std::chrono::high_resolution_clock::now();
-    auto sdf = SdfGenerator::GenerateSdfFromHeightmap(heightmap, layers);
+    auto sdf = SdfGeneratorCuda::GenerateSdfFromHeightmap(heightmap, layers);
+    //auto sdf = SdfGenerator::GenerateSdfFromHeightmap(heightmap, layers);
     auto end = std::chrono::high_resolution_clock::now();
     std::cout << std::format("Calculated SDF[{}, {}, {}] in {:.3f}s", sdf.Width(), sdf.Height(), sdf.Depth(),
         std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / 1000.0) << std::endl;

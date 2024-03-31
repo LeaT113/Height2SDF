@@ -14,7 +14,9 @@ public:
 
     const T* GetPixelsAt(size_t x, size_t y) const;
 
+    const T* DataPtr() const;
     T* DataPtr();
+    size_t DataSize() const;
 
     size_t Width() const;
     size_t Height() const;
@@ -48,10 +50,22 @@ const T* Image2D<T>::GetPixelsAt(size_t x, size_t y) const
     return _data.data() + x + y * _width;
 }
 
+template<typename T>
+const T * Image2D<T>::DataPtr() const
+{
+    return _data.data();
+}
+
 template <typename T>
 T* Image2D<T>::DataPtr()
 {
     return _data.data();
+}
+
+template<typename T>
+size_t Image2D<T>::DataSize() const
+{
+    return _width * _height * sizeof(T);
 }
 
 template <typename T>

@@ -14,6 +14,9 @@ public:
 
     const T* GetPixelsAt(size_t x, size_t y, size_t z) const;
 
+    T* DataPtr();
+    size_t DataSize() const;
+
     size_t Width() const;
     size_t Height() const;
     size_t Depth() const;
@@ -45,6 +48,18 @@ template <typename T>
 const T* Image3D<T>::GetPixelsAt(size_t x, size_t y, size_t z) const
 {
     return _data.data() + x + y * _width + z * _width * _height;
+}
+
+template<typename T>
+T * Image3D<T>::DataPtr()
+{
+    return _data.data();
+}
+
+template<typename T>
+size_t Image3D<T>::DataSize() const
+{
+    return _data.size() * sizeof(T);
 }
 
 template <typename T>
