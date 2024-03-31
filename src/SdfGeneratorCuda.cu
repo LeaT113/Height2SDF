@@ -9,23 +9,10 @@
 #define xyzInDims(xyz, dims) (xyz.x < dims.x && xyz.y < dims.y && xyz.z < dims.z)
 #define xyzIsZero(xyz) (xyz.x == 0 && xyz.y == 0 && xyz.z == 0)
 #define xyzDist2(xyz1, xyz2) ((xyz1.x - xyz2.x)*(xyz1.x - xyz2.x) + (xyz1.y - xyz2.y)*(xyz1.y - xyz2.y) + (xyz1.z - xyz2.z)*(xyz1.z - xyz2.z))
+#define posToUvw(pos, dims) (make_float3(pos.x, pos.y, (float)pos.z * dims.x / dims.z))
 
-static void HandleError( cudaError_t err,
-                         const char *file,
-                         int line ) {
-    if (err != cudaSuccess) {
-        printf( "%s in %s at line %d\n", cudaGetErrorString( err ),
-                file, line );
-        exit( EXIT_FAILURE );
-    }
-}
-#define HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
 
-__global__ void hello(float* fl) {
-    printf("Hello world! %f\n", *fl);
-}
-
-__global__ void JfaSeed(const float* heightmap, uint3* uvw, uint3 dims)
+__global__ void JfaSeed(const float* heightmap, float3* uvw, uint3 dims)
 {
     uint3 pos = make_uint3(
         blockIdx.x * blockDim.x + threadIdx.x,
@@ -35,26 +22,25 @@ __global__ void JfaSeed(const float* heightmap, uint3* uvw, uint3 dims)
     uint heightmapIdx = xyzToIdx(make_uint3(pos.x, pos.y, 0), dims);
     uint uvwIdx = xyzToIdx(pos, dims);
 
-    //if(pos.z >= (uint)((1.0f - heightmap[heightmapIdx]) * (float)(dims.z-1)))
-    if((float)pos.z / (float)dims.z > 1.0 - heightmap[heightmapIdx])
+    if(pos.z >= (uint)((1.0f - heightmap[heightmapIdx]) * dims.z))
     {
-        uvw[uvwIdx] = pos;
+        uvw[uvwIdx] = posToUvw(pos, dims);
     }
     else
     {
-        uvw[uvwIdx] = make_uint3(0, 0, 0);
+        uvw[uvwIdx] = make_float3(0, 0, 0);
     }
 }
 
-__global__ void JfaStep(uint3* uvwIn, uint3* uvwOut, uint3 dims, uint stepSize)
+__global__ void JfaStep(float3* uvwIn, float3* uvwOut, uint3 dims, uint stepSize)
 {
     uint3 pos = make_uint3(
         blockIdx.x * blockDim.x + threadIdx.x,
         blockIdx.y * blockDim.y + threadIdx.y,
         blockIdx.z * blockDim.z + threadIdx.z);
 
-    uint3 pixel = pos;
-    uint3 pixelSeed = uvwIn[xyzToIdx(pos, dims)];
+    float3 pixel = posToUvw(pos, dims);
+    float3 pixelSeed = uvwIn[xyzToIdx(pos, dims)];
 
     // TODO Unroll?
     for (int i = -1; i <= 1; i++)
@@ -65,8 +51,7 @@ __global__ void JfaStep(uint3* uvwIn, uint3* uvwOut, uint3 dims, uint stepSize)
                 if (!xyzInDims(neighbourPos, dims))
                     continue;
 
-                uint3 neighbourSeed = uvwIn[xyzToIdx(neighbourPos, dims)];
-                int3 neighbourSeedI = make_int3(neighbourSeed.x, neighbourSeed.y, neighbourSeed.z);
+                float3 neighbourSeed = uvwIn[xyzToIdx(neighbourPos, dims)];
 
                 bool pixelUndefined = xyzIsZero(pixelSeed);
                 bool neighbourUndefined = xyzIsZero(neighbourSeed);
@@ -87,7 +72,7 @@ __global__ void JfaStep(uint3* uvwIn, uint3* uvwOut, uint3 dims, uint stepSize)
     uvwOut[xyzToIdx(pos, dims)] = pixelSeed;
 }
 
-__global__ void JfaDist(const uint3* uvw, float* sdf, uint3 dims)
+__global__ void JfaDist(const float3* uvw, float* sdf, uint3 dims)
 {
     uint3 pos = make_uint3(
         blockIdx.x * blockDim.x + threadIdx.x,
@@ -96,11 +81,10 @@ __global__ void JfaDist(const uint3* uvw, float* sdf, uint3 dims)
 
     uint idx = xyzToIdx(pos, dims);
 
-    float3 pixel = make_float3(pos.x, pos.y, pos.z);
-    uint3 pixelSeed = uvw[idx];
-    float3 pixelSeedF = make_float3(pixelSeed.x, pixelSeed.y, pixelSeed.z);
+    float3 pixel = posToUvw(pos, dims);
+    float3 pixelSeed = uvw[idx];
 
-    sdf[idx] = norm3df(pixel.x - pixelSeedF.x, pixel.y - pixelSeedF.y, pixel.z - pixelSeedF.z) / 16;
+    sdf[idx] = norm3df(pixel.x - pixelSeed.x, pixel.y - pixelSeed.y, pixel.z - pixelSeed.z) / dims.x;
 }
 
 Image3D<float> SdfGeneratorCuda::GenerateSdfFromHeightmap(const Image2D<float> &heightmap, int depth)
@@ -110,10 +94,10 @@ Image3D<float> SdfGeneratorCuda::GenerateSdfFromHeightmap(const Image2D<float> &
     cudaMalloc(&heightmapDevice, heightmap.DataSize());
     cudaMemcpy(heightmapDevice, heightmap.DataPtr(), heightmap.DataSize(), cudaMemcpyHostToDevice);
 
-    uint3* uvwDevice1;
-    cudaMalloc(&uvwDevice1, heightmap.Width() * heightmap.Height() * depth * sizeof(uint3));
-    uint3* uvwDevice2;
-    cudaMalloc(&uvwDevice2, heightmap.Width() * heightmap.Height() * depth * sizeof(uint3));
+    float3* uvwDevice1;
+    cudaMalloc(&uvwDevice1, heightmap.Width() * heightmap.Height() * depth * sizeof(float3));
+    float3* uvwDevice2;
+    cudaMalloc(&uvwDevice2, heightmap.Width() * heightmap.Height() * depth * sizeof(float3));
 
     float* sdfDevice;
     cudaMalloc(&sdfDevice, heightmap.Width() * heightmap.Height() * depth * sizeof(float));
@@ -129,27 +113,28 @@ Image3D<float> SdfGeneratorCuda::GenerateSdfFromHeightmap(const Image2D<float> &
 
     // Seed
     JfaSeed<<<blocks, blockSize>>>(heightmapDevice, uvwDevice1, dims);
-    cudaDeviceSynchronize();
 
-    // Step
+    // Step (run 1+JFA+1)
+    JfaStep<<<blocks, blockSize>>>(uvwDevice1, uvwDevice2, dims, 1);
+    std::swap(uvwDevice1, uvwDevice2);
     uint stepSize = dims.x;
     while(true)
     {
         stepSize /= 2;
         JfaStep<<<blocks, blockSize>>>(uvwDevice1, uvwDevice2, dims, stepSize);
-        cudaDeviceSynchronize();
         std::swap(uvwDevice1, uvwDevice2);
 
         if(stepSize <= 1)
             break;
     }
+    JfaStep<<<blocks, blockSize>>>(uvwDevice1, uvwDevice2, dims, 1);
+    std::swap(uvwDevice1, uvwDevice2);
 
     // Distance
     JfaDist<<<blocks, blockSize>>>(uvwDevice1, sdfDevice, dims);
-    cudaDeviceSynchronize();
 
     // Retrieve
-    auto sdf = Image3D<float>(128, 128, 16);
+    auto sdf = Image3D<float>(dims.x, dims.y, dims.z);
     cudaMemcpy(sdf.DataPtr(), sdfDevice, heightmap.Width() * heightmap.Height() * depth * sizeof(float), cudaMemcpyDeviceToHost);
 
     cudaFree(heightmapDevice);
