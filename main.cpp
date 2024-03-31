@@ -2,10 +2,10 @@
 #include <filesystem>
 #include <format>
 
-#include "src/ImageIO.hpp"
-#include "src/SdfGenerator.hpp"
 #include "argh.h"
-#include "src/SdfGeneratorCuda.cuh"
+#include "src/Image/ImageIO.hpp"
+#include "src/SdfGenerator/SdfGenerator.hpp"
+#include "src/SdfGenerator/SdfGeneratorCuda.cuh"
 
 
 auto constexpr USAGE =
@@ -18,6 +18,10 @@ Options:
                                 Default is output_sdf.tiff
     -l, --layers <layers>       Number of layers in the Z dimension
                                 Default is 10
+    -a, --algorithm <index>     0 - JFA (default)
+                                1 - 1+JFA
+                                2 - 1+JFA+2
+                                3 - JFA^2
 )";
 
 int main(int argc, char* argv[])
@@ -30,15 +34,22 @@ int main(int argc, char* argv[])
         return 1;
     }
     std::filesystem::path heightmapPath (cmdl[1]);
+    std::filesystem::path outputPath (cmdl({"-o", "--output"}, "output_sdf.tiff").str());
     int layers;
     cmdl({"-l", "--layers"}, 10) >> layers;
-    std::filesystem::path outputPath (cmdl({"-o", "--output"}, "output_sdf.tiff").str());
+    int algoInt;
+    cmdl({"-a", "--algorithm"}, 0) >> algoInt;
+    auto algo = static_cast<JfaAlgorithm>(algoInt);
 
+    // Load heightmap
     auto heightmap = ImageIO::LoadHeightmap(absolute(heightmapPath));
 
+    // Run SDF generation
     auto start = std::chrono::high_resolution_clock::now();
-    auto sdf = SdfGeneratorCuda::GenerateSdfFromHeightmap(heightmap, layers);
-    //auto sdf = SdfGenerator::GenerateSdfFromHeightmap(heightmap, layers);
+
+    auto sdf = SdfGenerator::GenerateSdfFromHeightmap(heightmap, layers, algo);
+    //auto sdf = SdfGeneratorCuda::GenerateSdfFromHeightmap(heightmap, layers, algo);
+
     auto end = std::chrono::high_resolution_clock::now();
     std::cout << std::format("Calculated SDF[{}, {}, {}] in {:.3f}s", sdf.Width(), sdf.Height(), sdf.Depth(),
         std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / 1000.0) << std::endl;

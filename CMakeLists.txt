@@ -8,12 +8,14 @@ set(CMAKE_CUDA_FLAGS "-Wall")
 set(CMAKE_CUDA_ARCHITECTURES 75-real)
 
 add_executable(${PROJECT_NAME} main.cpp
-        src/ImageIO.hpp src/ImageIO.cpp
-        src/Image2D.hpp src/Image2D.cpp
-        src/Image3D.hpp src/Image3D.cpp
-        src/SdfGenerator.hpp src/SdfGenerator.cpp
-        src/SdfGeneratorCuda.cu
-        src/SdfGeneratorCuda.cuh
+        src/Image/ImageIO.hpp src/Image/ImageIO.cpp
+        src/Image/Image2D.hpp src/Image/Image2D.cpp
+        src/Image/Image3D.hpp src/Image/Image3D.cpp
+        src/SdfGenerator/SdfGenerator.hpp src/SdfGenerator/SdfGenerator.cpp
+        src/SdfGenerator/SdfGeneratorCuda.cu
+        src/SdfGenerator/SdfGeneratorCuda.cuh
+        src/SdfGenerator/ISdfGenerator.cpp
+        src/SdfGenerator/ISdfGenerator.h
 )
 
 find_package(Stb REQUIRED)

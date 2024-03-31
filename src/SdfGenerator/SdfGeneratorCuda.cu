@@ -4,6 +4,7 @@
 
 #include "SdfGeneratorCuda.cuh"
 #include <vector_types.h>
+#include "ISdfGenerator.h"
 
 #define xyzToIdx(xyz, dims) (xyz.x + xyz.y * dims.x + xyz.z * dims.x * dims.y)
 #define xyzInDims(xyz, dims) (xyz.x < dims.x && xyz.y < dims.y && xyz.z < dims.z)
@@ -87,7 +88,7 @@ __global__ void JfaDist(const float3* uvw, float* sdf, uint3 dims)
     sdf[idx] = norm3df(pixel.x - pixelSeed.x, pixel.y - pixelSeed.y, pixel.z - pixelSeed.z) / dims.x;
 }
 
-Image3D<float> SdfGeneratorCuda::GenerateSdfFromHeightmap(const Image2D<float> &heightmap, int depth)
+Image3D<float> SdfGeneratorCuda::GenerateSdfFromHeightmap(const Image2D<float> &heightmap, int depth, JfaAlgorithm algorithm)
 {
     // GPU memory
     float* heightmapDevice;
@@ -114,9 +115,12 @@ Image3D<float> SdfGeneratorCuda::GenerateSdfFromHeightmap(const Image2D<float> &
     // Seed
     JfaSeed<<<blocks, blockSize>>>(heightmapDevice, uvwDevice1, dims);
 
-    // Step (run 1+JFA+1)
-    JfaStep<<<blocks, blockSize>>>(uvwDevice1, uvwDevice2, dims, 1);
-    std::swap(uvwDevice1, uvwDevice2);
+    // Step
+    if (algorithm == OnePlusJFA || OnePlusJFAPlusTwo)
+    {
+        JfaStep<<<blocks, blockSize>>>(uvwDevice1, uvwDevice2, dims, 1);
+        std::swap(uvwDevice1, uvwDevice2);
+    }
     uint stepSize = dims.x;
     while(true)
     {
@@ -127,8 +131,26 @@ Image3D<float> SdfGeneratorCuda::GenerateSdfFromHeightmap(const Image2D<float> &
         if(stepSize <= 1)
             break;
     }
-    JfaStep<<<blocks, blockSize>>>(uvwDevice1, uvwDevice2, dims, 1);
-    std::swap(uvwDevice1, uvwDevice2);
+    if(algorithm == OnePlusJFAPlusTwo)
+    {
+        JfaStep<<<blocks, blockSize>>>(uvwDevice1, uvwDevice2, dims, 2);
+        std::swap(uvwDevice1, uvwDevice2);
+        JfaStep<<<blocks, blockSize>>>(uvwDevice1, uvwDevice2, dims, 1);
+        std::swap(uvwDevice1, uvwDevice2);
+    }
+    else if (algorithm == JFASquared)
+    {
+        stepSize = dims.x;
+        while(true)
+        {
+            stepSize /= 2;
+            JfaStep<<<blocks, blockSize>>>(uvwDevice1, uvwDevice2, dims, stepSize);
+            std::swap(uvwDevice1, uvwDevice2);
+
+            if(stepSize <= 1)
+                break;
+        }
+    }
 
     // Distance
     JfaDist<<<blocks, blockSize>>>(uvwDevice1, sdfDevice, dims);
