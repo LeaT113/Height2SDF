@@ -8,7 +8,7 @@ void JfaSeed(const Image2D<float>& heightmap, Image3D<glm::vec3>& out)
         for(int y = 0; y < out.Height(); y++)
             for(int x = 0; x < out.Width(); x++)
             {
-                bool isSeed = z >= static_cast<int>((1 - heightmap(x, y)) * out.Depth());
+                bool isSeed = z >= static_cast<int>((1.0f - heightmap(x, y)) * out.Depth());
                 auto uvw = glm::vec3(x, y, static_cast<float>(z) * out.Width() / out.Depth());
 
                 out(x, y, z) = isSeed ? uvw : glm::vec3(0);
@@ -47,7 +47,7 @@ void JfaStep(const Image3D<glm::vec3>& uvwIn, Image3D<glm::vec3>& uvwOut, int ra
                                 // P takes value of N if empty
                                 if (pixelSeedUndefined)
                                     pixelSeed = neighbourSeed;
-                                else if (length2(pixel - pixelSeed) < length2(pixel - neighbourSeed))
+                                else if (length2(pixel - neighbourSeed) < length2(pixel - pixelSeed))
                                 {
                                     pixelSeed = neighbourSeed;
                                 }
