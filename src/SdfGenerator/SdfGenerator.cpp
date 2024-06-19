@@ -80,7 +80,7 @@ Image3D<float> SdfGenerator::GenerateSdfFromHeightmap(const Image2D<float>& heig
     JfaSeed(heightmap, uvw1);
 
     // Step
-    if (algorithm == OnePlusJFA || OnePlusJFAPlusTwo)
+    if (algorithm == OnePlusJFA || algorithm == OnePlusJFAPlusTwo)
     {
         JfaStep(uvw1, uvw2, 1);
         std::swap(uvw1, uvw2);

@@ -116,7 +116,7 @@ Image3D<float> SdfGeneratorCuda::GenerateSdfFromHeightmap(const Image2D<float> &
     JfaSeed<<<blocks, blockSize>>>(heightmapDevice, uvwDevice1, dims);
 
     // Step
-    if (algorithm == OnePlusJFA || OnePlusJFAPlusTwo)
+    if (algorithm == OnePlusJFA || algorithm == OnePlusJFAPlusTwo)
     {
         JfaStep<<<blocks, blockSize>>>(uvwDevice1, uvwDevice2, dims, 1);
         std::swap(uvwDevice1, uvwDevice2);

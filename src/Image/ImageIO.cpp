@@ -21,7 +21,7 @@ Image2D<float> ImageIO::LoadHeightmap(const std::filesystem::path& path)
 
     stbi_image_free(img);
 
-    return std::move(image2D);
+    return image2D;
 }
 
 void ImageIO::ExportImage3DToTiff(const Image3D<uint8_t>& image, const std::filesystem::path& path)

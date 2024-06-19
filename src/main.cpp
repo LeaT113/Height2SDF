@@ -1,11 +1,11 @@
 #include <iostream>
 #include <filesystem>
 #include <format>
+#include <argh.h>
 
-#include "argh.h"
-#include "src/Image/ImageIO.hpp"
-#include "src/SdfGenerator/SdfGenerator.hpp"
-#include "src/SdfGenerator/SdfGeneratorCuda.cuh"
+#include "Image/ImageIO.hpp"
+#include "SdfGenerator/SdfGenerator.hpp"
+#include "SdfGenerator/SdfGeneratorCuda.cuh"
 
 
 auto constexpr USAGE =
@@ -18,6 +18,7 @@ Options:
                                 Default is output_sdf.tiff
     -l, --layers <layers>       Number of layers in the Z dimension
                                 Default is 10
+    -c, --cuda                  Use CUDA for calculation
     -a, --algorithm <index>     0 - JFA (default)
                                 1 - 1+JFA
                                 2 - 1+JFA+2
@@ -40,17 +41,18 @@ int main(int argc, char* argv[])
     int algoInt;
     cmdl({"-a", "--algorithm"}, 0) >> algoInt;
     auto algo = static_cast<JfaAlgorithm>(algoInt);
+    bool useCuda = cmdl[{"-c", "--cuda"}];
 
     // Load heightmap
     auto heightmap = ImageIO::LoadHeightmap(absolute(heightmapPath));
 
     // Run SDF generation
     auto start = std::chrono::high_resolution_clock::now();
-
-    auto sdf = SdfGenerator::GenerateSdfFromHeightmap(heightmap, layers, algo);
-    //auto sdf = SdfGeneratorCuda::GenerateSdfFromHeightmap(heightmap, layers, algo);
-
+    auto sdf = useCuda ?
+                SdfGeneratorCuda::GenerateSdfFromHeightmap(heightmap, layers, algo) :
+                SdfGenerator::GenerateSdfFromHeightmap(heightmap, layers, algo);
     auto end = std::chrono::high_resolution_clock::now();
+
     std::cout << std::format("Calculated SDF[{}, {}, {}] in {:.3f}s", sdf.Width(), sdf.Height(), sdf.Depth(),
         std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / 1000.0) << std::endl;
 
